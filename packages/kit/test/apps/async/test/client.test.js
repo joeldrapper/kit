@@ -1391,3 +1391,32 @@ test.describe('fork', () => {
 		await expect(page.locator('a[href="/fork/1"]')).toBeVisible();
 	});
 });
+
+test.describe('layouts', () => {
+	test('navigating to a page with fewer layouts survives an unrelated update while the page loads', async ({
+		page,
+		app
+	}) => {
+		/** @type {string[]} */
+		const errors = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+
+		await page.goto('/fewer-layouts/deep/inner');
+		await expect(page.locator('h1')).toHaveText('deep');
+
+		// the new page awaits a promise we hold, so the old page stays on screen
+		void app.goto('/fewer-layouts/shallow');
+		await page.evaluate(() => new Promise((r) => setTimeout(r, 100)));
+
+		// something outside the new page updates while it's still loading
+		await page.getByRole('button', { name: 'inner: 0' }).click();
+		await page.getByRole('button', { name: 'count: 0' }).click();
+		await expect(page.getByRole('button', { name: 'count: 1' })).toBeVisible();
+
+		await page.getByRole('button', { name: 'release' }).click();
+		await expect(page.locator('h1')).toHaveText('shallow');
+		await expect(page).toHaveURL('/fewer-layouts/shallow');
+
+		expect(errors).toEqual([]);
+	});
+});

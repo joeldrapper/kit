@@ -1,7 +1,3 @@
-<script>
-	import { hold } from '../held.svelte.js';
-	import { tick } from 'svelte';
-</script>
+<h1>shallow</h1>
 
-<p>{await tick().then(() => 'ticked')}</p>
-<h1>{await hold()}</h1>
+<a href="/fewer-layouts/deep/inner">deep</a>

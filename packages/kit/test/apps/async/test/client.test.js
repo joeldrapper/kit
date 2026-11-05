@@ -1393,7 +1393,7 @@ test.describe('fork', () => {
 });
 
 test.describe('layouts', () => {
-	test('navigating to a page with fewer layouts survives an unrelated update while the page loads', async ({
+	test('an unrelated update while a page with more layouts is still waiting does not read a missing node', async ({
 		page,
 		app
 	}) => {
@@ -1401,21 +1401,25 @@ test.describe('layouts', () => {
 		const errors = [];
 		page.on('pageerror', (error) => errors.push(error.message));
 
-		await page.goto('/fewer-layouts/deep/inner');
-		await expect(page.locator('h1')).toHaveText('deep');
+		await page.goto('/fewer-layouts/shallow');
+		await expect(page.locator('h1')).toHaveText('shallow');
 
-		// the new page awaits a promise we hold, so the old page stays on screen
-		void app.goto('/fewer-layouts/shallow');
-		await page.evaluate(() => new Promise((r) => setTimeout(r, 100)));
+		// the deeper page draws, with a boundary still waiting on a promise we hold
+		void app.goto('/fewer-layouts/deep/inner');
+		await expect(page.getByText('waiting')).toBeVisible();
+		await expect(page.locator('#path')).toHaveText('/fewer-layouts/deep/inner');
 
-		// something outside the new page updates while it's still loading
+		// updates inside and outside the new page while the boundary waits
 		await page.getByRole('button', { name: 'inner: 0' }).click();
+		await expect(page.getByRole('button', { name: 'inner: 1' })).toBeVisible();
 		await page.getByRole('button', { name: 'count: 0' }).click();
 		await expect(page.getByRole('button', { name: 'count: 1' })).toBeVisible();
 
-		await page.getByRole('button', { name: 'release' }).click();
+		// going back to the shallower page while it still waits
+		await app.goto('/fewer-layouts/shallow');
 		await expect(page.locator('h1')).toHaveText('shallow');
-		await expect(page).toHaveURL('/fewer-layouts/shallow');
+		await page.getByRole('button', { name: 'count: 1' }).click();
+		await expect(page.getByRole('button', { name: 'count: 2' })).toBeVisible();
 
 		expect(errors).toEqual([]);
 	});
